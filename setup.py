@@ -23,7 +23,7 @@ setup(name='py-secobj' ,
     author='Jay Deiman' ,
     author_email='admin@splitstreams.com' ,
     url='http://stuffivelearned.org/doku.php?id=programming:python:py-secobj' ,
-    description='A simple object encryptor and decrytor' ,
+    description='A simple object encryptor and decryptor' ,
     py_modules=['secobj'] ,
     classifiers=[
         'Development Status :: 4 - Beta' ,
