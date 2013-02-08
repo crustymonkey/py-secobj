@@ -19,7 +19,7 @@
 from distutils.core import setup
 
 setup(name='py-secobj' ,
-    version='0.1.0' ,
+    version='0.2.0' ,
     author='Jay Deiman' ,
     author_email='admin@splitstreams.com' ,
     url='http://stuffivelearned.org/doku.php?id=programming:python:py-secobj' ,

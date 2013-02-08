@@ -57,11 +57,60 @@ class EncObject(object):
         """
         # Hash the key as we will use the hash instead of the actual
         # key for encryption/decryption
-        s = sha256()
-        s.update(key)
-        self._hkey = s.digest()
+        self._hkey = ''
+        self.updateKey(key)
         self._pckFmt = '!I'
         self._blkSize = AES.block_size
+
+    def updateKey(self , newKey):
+        """
+        Change the key value used for encrypt/decrypt and return the new
+        digest
+
+        newKey:str      The new passphrase
+
+        returns:str    
+        """
+        s = sha256()
+        s.update(newKey)
+        self._hkey = s.digest()
+        return self._hkey
+
+    @classmethod
+    def chgKeyForFile(cls , fobj , curKey , newKey):
+        """
+        Changes the key for a previously encrypted object.  Note that 
+        this is a class method.
+
+        fobj:(str|file)     A string filename to write the object to
+                            or a file-like object.  Note that the
+                            object will be written wherever the
+                            current position is if it is a file-like
+                            object.
+        curKey:str          The passphrase used to encrypt the file 
+                            originally
+        newKey:str          The new passphrase to use when encrypting the
+                            file again
+        """
+        fh = fobj
+        closeFile = False
+        if isinstance(fh , basestring):
+            # We have a filename
+            closeFile = True
+            fh = open(fobj , 'r+b')
+        inst = cls(curKey)
+        # Decrypt the object
+        fh.seek(0)
+        obj = inst.decryptFromFile(fh)
+        # Truncate the file
+        fh.seek(0)
+        fh.truncate()
+        # Update the key and reencrypt
+        inst.updateKey(newKey)
+        inst.encryptToFile(obj , fh)
+        # Close the file, if necessary
+        if closeFile:
+            fh.close()
 
     def encryptToFile(self , obj , fobj):
         """
