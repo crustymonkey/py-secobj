@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (C) 2013  Jay Deiman
 # 
@@ -19,7 +19,7 @@
 from distutils.core import setup
 
 setup(name='py-secobj' ,
-    version='0.2.0' ,
+    version='0.3.0' ,
     author='Jay Deiman' ,
     author_email='admin@splitstreams.com' ,
     url='http://stuffivelearned.org/doku.php?id=programming:python:py-secobj' ,
@@ -31,7 +31,7 @@ setup(name='py-secobj' ,
         'Intended Audience :: System Administrators' ,
         'License :: OSI Approved :: GNU General Public License v2 (GPLv2)' ,
         'Operating System :: OS Independent' ,
-        'Programming Language :: Python :: 2' ,
+        'Programming Language :: Python :: 3' ,
         'Topic :: Software Development :: Libraries' ,
         'Topic :: Software Development :: Libraries :: Python Modules' ,
         'Topic :: Utilities' ,

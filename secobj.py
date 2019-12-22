@@ -10,16 +10,16 @@ import secobj
 
 passphrase = 'spam and eggs'
 fname = '/var/tmp/test.enc'
-myObj = [1 , 2 , 3]
+myObj = [1, 2, 3]
 enc = secobj.EncObject(passphrase)
     
 # Encrypt to file and decrypt
-enc.encryptToFile(myObj , fname)
-unencryptedObject = enc.decryptFromFile(fname , True)
+enc.encrypt_to_file(my_obj, fname)
+unencrypted_object = enc.decrypt_from_file(fname, True)
        
 # Encrypt to string.  You will need to hold on to your IV here
-encStr , IV = enc.encryptToStr(myObj)
-unencryptedObject  = enc.decryptFromStr(encStr , IV)
+enc_str, iv = enc.encrypt_to_str(my_obj)
+unencrypted_object  = enc.decrypt_from_str(enc_str, iv)
 """
 
 # Copyright (C) 2013  Jay Deiman
@@ -38,18 +38,21 @@ unencryptedObject  = enc.decryptFromStr(encStr , IV)
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+
 import Crypto.Random as crandom
 from hashlib import sha256
 from Crypto.Cipher import AES
-from cStringIO import StringIO
-import cPickle as pickle
-import os , struct
+from io import BytesIO
+import pickle as pickle
+import os, struct
+
 
 class DecryptError(Exception):
     pass
 
+
 class EncObject(object):
-    def __init__(self , key):
+    def __init__(self, key):
         """
         Initialize the encryptor/decryptor.
 
@@ -58,11 +61,12 @@ class EncObject(object):
         # Hash the key as we will use the hash instead of the actual
         # key for encryption/decryption
         self._hkey = ''
-        self.updateKey(key)
-        self._pckFmt = '!I'
-        self._blkSize = AES.block_size
+        self.update_key(key)
+        self._pck_fmt = '!I'
+        self._blk_size = AES.block_size
+        self._aes_mode = AES.MODE_CFB
 
-    def updateKey(self , newKey):
+    def update_key(self, new_key):
         """
         Change the key value used for encrypt/decrypt and return the new
         digest
@@ -72,12 +76,12 @@ class EncObject(object):
         returns:str    
         """
         s = sha256()
-        s.update(newKey)
+        s.update(new_key.encode('utf-8'))
         self._hkey = s.digest()
         return self._hkey
 
     @classmethod
-    def chgKeyForFile(cls , fobj , curKey , newKey):
+    def chg_key_for_file(cls, fobj, cur_key, new_key):
         """
         Changes the key for a previously encrypted object.  Note that 
         this is a class method.
@@ -87,32 +91,33 @@ class EncObject(object):
                             object will be written wherever the
                             current position is if it is a file-like
                             object.
-        curKey:str          The passphrase used to encrypt the file 
+        cur_key:str          The passphrase used to encrypt the file 
                             originally
-        newKey:str          The new passphrase to use when encrypting the
+        new_key:str          The new passphrase to use when encrypting the
                             file again
         """
         fh = fobj
-        closeFile = False
-        if isinstance(fh , basestring):
+        close_file = False
+        if isinstance(fh, str):
             # We have a filename
-            closeFile = True
-            fh = open(fobj , 'r+b')
-        inst = cls(curKey)
+            close_file = True
+            fh = open(fobj, 'r+b')
+
+        inst = cls(cur_key)
         # Decrypt the object
         fh.seek(0)
-        obj = inst.decryptFromFile(fh)
+        obj = inst.decrypt_from_file(fh)
         # Truncate the file
         fh.seek(0)
         fh.truncate()
         # Update the key and reencrypt
-        inst.updateKey(newKey)
-        inst.encryptToFile(obj , fh)
+        inst.update_key(new_key)
+        inst.encrypt_to_file(obj, fh)
         # Close the file, if necessary
-        if closeFile:
+        if close_file:
             fh.close()
 
-    def encryptToFile(self , obj , fobj):
+    def encrypt_to_file(self, obj, fobj):
         """
         Encrypt the object and store it on disk.
 
@@ -125,29 +130,31 @@ class EncObject(object):
                             object.
         """
         fh = fobj
-        closeFile = False
-        if isinstance(fh , basestring):
+        close_file = False
+        if isinstance(fh, str):
             # We have a filename
-            closeFile = True
-            fh = open(fobj , 'wb')
+            close_file = True
+            fh = open(fobj, 'wb')
+
         # Get a stringIO object and the data length
-        sio = self._getStrIOObj(obj , False)
-        dLen = sio.tell()
+        sio = self._get_str_io_obj(obj, False)
+        d_len = sio.tell()
         sio.seek(0)
-        iv = self._genIV()
-        aes = AES.new(self._hkey , AES.MODE_CBC , iv)
+        iv = self._gen_iv()
+        aes = AES.new(self._hkey, self._aes_mode, iv)
+
         fh.write(iv)
-        # The first block is the length plus the first 12 bytes
-        buf = '%s%s' % (struct.pack(self._pckFmt , dLen) , sio.read(12))
-        while len(buf):
-            fh.write(aes.encrypt(buf))
-            buf = sio.read(self._blkSize)
-        if closeFile:
+        # The first block is the length plus the data
+        pck_len = struct.pack(self._pck_fmt, d_len)
+        buf = pck_len + sio.read()
+        fh.write(aes.encrypt(buf))
+
+        if close_file:
             # Only close a file opened in this method
             fh.close()
         sio.close()
 
-    def decryptFromFile(self , fobj , delFile=False):
+    def decrypt_from_file(self, fobj, del_file=False):
         """
         Decrypts and returns object from disk
 
@@ -155,44 +162,50 @@ class EncObject(object):
                             read from.  Note that the object will be
                             read from whereever the current file
                             position is if it is a file-like object.
-        delFile:bool        Remove the file after decrypting its contents.
+        del_file:bool       Remove the file after decrypting its contents.
                             This will raise an IOError if the file can't
                             be deleted for some reason.
 
         returns:object
         """
         fh = fobj
-        closeFile = False
-        if isinstance(fh , basestring):
-            closeFile = True
-            fh = open(fobj , 'rb')
+        close_file = False
+        if isinstance(fh, str):
+            close_file = True
+            fh = open(fobj, 'rb')
+
         fname = fh.name
         # Read in the IV
-        iv = fh.read(self._blkSize)
-        aes = AES.new(self._hkey , AES.MODE_CBC , iv)
+        iv = fh.read(self._blk_size)
+        aes = AES.new(self._hkey, self._aes_mode, iv)
         buf = aes.decrypt(fh.read())
-        rawLen = len(buf[4:])
-        buf = buf.rstrip('\x00')
-        if closeFile:
+        raw_len = len(buf[4:])
+        buf = buf.rstrip(b'\x00')
+
+        if close_file:
             # Only close a file opened in this method
             fh.close()
-        if delFile:
+
+        if del_file:
             os.unlink(fname)
+
         # The first 4 bytes will be the packed int length
-        dLen = struct.unpack(self._pckFmt , buf[:4])[0]
-        if dLen != rawLen:
+        d_len = struct.unpack(self._pck_fmt, buf[:4])[0]
+        if d_len != raw_len:
             raise DecryptError('Invalid data length. This is usually a '
                 'bad passphrase. Expected len: %d; Actual len: %d' %
-                (dLen , rawLen))
+                (d_len, raw_len))
+
         # Return the unpickled object
         try:
             obj = pickle.loads(buf[4:])
         except:
             raise DecryptError('Error decrypting and loading the object. '
                 'Likely this is an invalid passphrase or IV')
+
         return obj
 
-    def encryptToStr(self , obj):
+    def encrypt_to_str(self, obj):
         """
         Encrypts an object to a string and returns the string and 
         the IV used in the process.  Unlike encryptToFile, the data
@@ -201,60 +214,65 @@ class EncObject(object):
 
         obj:object      The object to encrypt
 
-        returns(str:encObj , str:IV)
+        returns(str:enc_obj, str:IV)
         """
-        iv = self._genIV()
-        sio = self._getStrIOObj(obj)
-        aes = AES.new(self._hkey , AES.MODE_CBC , iv)
+        iv = self._gen_iv()
+        sio = self._get_str_io_obj(obj)
+        aes = AES.new(self._hkey, self._aes_mode, iv)
         enc = aes.encrypt(sio.getvalue())
         sio.close()
-        return (enc , iv)
+        return (enc, iv)
 
-    def decryptFromStr(self , encStr , iv):
+    def decrypt_from_str(self, enc_str, iv):
         """
         Decrypts an object from a string encrypted with encryptToStr
         and returns it
 
-        encStr:str      The encrypted object string
+        enc_str:str     The encrypted object string
         iv:str          The IV used to encrypt the object
 
         returns:object
         """
-        aes = AES.new(self._hkey , AES.MODE_CBC , iv)
-        buf = aes.decrypt(encStr).rstrip('\x00')
+        aes = AES.new(self._hkey, self._aes_mode, iv)
+        buf = aes.decrypt(enc_str).rstrip(b'\x00')
+
         try:
             obj = pickle.loads(buf)
         except:
             raise DecryptError('Error decrypting and loading the object. '
                 'Likely this is an invalid passphrase or IV')
+
         return obj
         
-    def _genIV(self):
+    def _gen_iv(self):
         """
         Returns an IV
         """
-        return crandom.get_random_bytes(self._blkSize)
+        return crandom.get_random_bytes(self._blk_size)
         
-    def _getStrIOObj(self , obj , padFull=True):
+    def _get_str_io_obj(self, obj, pad_full=True):
         """
         Pickles the object and pads it will null bytes
 
         obj:object      The object to be stringified
-        padFull:bool    If this is False, it will pad at block
+        pad_full:bool    If this is False, it will pad at block
                         size minus four to account for the 
                         unsigned int pre-pended in file encryption.
                         Otherwise, it will be padded to block size.
 
-        returns:StringIO
+        returns:BytesIO
         """
-        sio = StringIO()
+        sio = BytesIO()
         sio.write(pickle.dumps(obj))
-        dataLen = sio.tell()
+        data_len = sio.tell()
         # Subtract 4 for the unsigned int length that's prepended
-        subSize = self._blkSize
-        if not padFull:
-            subSize -= 4
-        pad = subSize - dataLen % self._blkSize
-        if pad != self._blkSize:
-            sio.write('\x00' * pad)
+        sub_size = self._blk_size
+
+        if not pad_full:
+            sub_size -= 4
+
+        pad = sub_size - data_len % self._blk_size
+        if pad != self._blk_size:
+            sio.write(b'\x00' * pad)
+
         return sio
