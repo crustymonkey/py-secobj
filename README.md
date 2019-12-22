@@ -37,15 +37,15 @@ import secobj
 
 passphrase = 'spam and eggs'
 fname = '/var/tmp/test.enc'
-myObj = [1 , 2 , 3]
+my_obj = [1 , 2 , 3]
 enc = secobj.EncObject(passphrase)
 
 # Encrypt to file and decrypt
-enc.encryptToFile(myObj , fname)
-unencryptedObject = enc.decryptFromFile(fname , True)
+enc.encrypt_to_file(my_obj , fname)
+unencrypted_object = enc.decrypt_from_file(fname , True)
 
 # Encrypt to string.  You will need to hold on to your IV here
-encStr , IV = enc.encryptToStr(myObj)
-unencryptedObject  = enc.decryptFromStr(encStr , IV)
+enc_str , iv = enc.encrypt_to_str(my_obj)
+unencrypted_object  = enc.decrypt_from_str(enc_str , iv)
 ```
 
